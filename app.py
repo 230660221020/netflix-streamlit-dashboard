@@ -2,21 +2,21 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# ======================
+# ===============================
 # PAGE CONFIG
-# ======================
+# ===============================
 st.set_page_config(
     page_title="Netflix Analytics Dashboard",
     layout="wide"
 )
 
-# ======================
-# NETFLIX STYLE CSS
-# ======================
+# ===============================
+# CUSTOM CSS (NETFLIX STYLE)
+# ===============================
 st.markdown("""
 <style>
 .stApp {
-    background-color: #141414;
+    background-color: #0E1117;
     color: white;
 }
 
@@ -25,139 +25,149 @@ h1, h2, h3 {
 }
 
 .metric-card {
-    background-color: #1f1f1f;
+    background-color: #1F2933;
     padding: 20px;
-    border-radius: 12px;
+    border-radius: 15px;
     text-align: center;
-    box-shadow: 0px 0px 10px rgba(0,0,0,0.4);
+    box-shadow: 0px 4px 12px rgba(0,0,0,0.5);
 }
 
 .metric-title {
-    font-size: 18px;
-    color: #b3b3b3;
+    font-size: 16px;
+    color: #AAAAAA;
 }
 
 .metric-value {
-    font-size: 36px;
+    font-size: 32px;
     font-weight: bold;
-    color: #ffffff;
+    color: #FFFFFF;
+}
+
+.sidebar .sidebar-content {
+    background-color: #111111;
 }
 </style>
 """, unsafe_allow_html=True)
 
-# ======================
+# ===============================
 # LOAD DATA
-# ======================
-df = pd.read_csv("NetFlix.csv")
+# ===============================
+@st.cache_data
+def load_data():
+    df = pd.read_csv("NetFlix.csv")
+    return df
 
-# Safe preprocessing
-df["date_added"] = pd.to_datetime(df["date_added"], errors="coerce")
-df["year_added"] = df["date_added"].dt.year
+df = load_data()
+
+# ===============================
+# DATA CLEANING RINGAN (AMAN)
+# ===============================
 df["duration"] = df["duration"].astype(str)
-df["duration_number"] = df["duration"].str.extract("(\d+)")[0].astype(float)
+df["duration_number"] = df["duration"].str.extract(r"(\d+)").astype(float)
+df = df.dropna(subset=["duration_number", "release_year", "type"])
 
-# ======================
-# SIDEBAR FILTER
-# ======================
-st.sidebar.header("🎬 Filter Konten")
-
-content_type = st.sidebar.selectbox(
-    "Pilih Jenis Konten",
-    ["All", "Movie", "TV Show"]
+# ===============================
+# HEADER
+# ===============================
+st.title("🎬 Netflix Analytics Dashboard")
+st.markdown(
+    "Dashboard interaktif untuk analisis dan segmentasi konten Netflix menggunakan pendekatan Big Data."
 )
 
-year_range = st.sidebar.slider(
-    "Pilih Tahun Rilis",
-    int(df["release_year"].min()),
-    int(df["release_year"].max()),
-    (2010, 2020)
-)
-
-filtered_df = df.copy()
-
-if content_type != "All":
-    filtered_df = filtered_df[filtered_df["type"] == content_type]
-
-filtered_df = filtered_df[
-    (filtered_df["release_year"] >= year_range[0]) &
-    (filtered_df["release_year"] <= year_range[1])
-]
-
-# ======================
-# TITLE
-# ======================
-st.title("📊 Netflix Content Analytics Dashboard")
-st.write("Dashboard interaktif untuk menganalisis konten Netflix berdasarkan jenis, genre, negara, dan tren waktu.")
-
-st.divider()
-
-# ======================
+# ===============================
 # METRIC CARDS
-# ======================
+# ===============================
 col1, col2, col3 = st.columns(3)
 
 with col1:
     st.markdown(f"""
     <div class="metric-card">
         <div class="metric-title">Total Konten</div>
-        <div class="metric-value">{len(filtered_df)}</div>
+        <div class="metric-value">{df.shape[0]}</div>
     </div>
     """, unsafe_allow_html=True)
 
 with col2:
     st.markdown(f"""
     <div class="metric-card">
-        <div class="metric-title">Movie</div>
-        <div class="metric-value">{(filtered_df["type"] == "Movie").sum()}</div>
+        <div class="metric-title">Rata-rata Durasi</div>
+        <div class="metric-value">{df['duration_number'].mean():.1f}</div>
     </div>
     """, unsafe_allow_html=True)
 
 with col3:
     st.markdown(f"""
     <div class="metric-card">
-        <div class="metric-title">TV Show</div>
-        <div class="metric-value">{(filtered_df["type"] == "TV Show").sum()}</div>
+        <div class="metric-title">Jumlah Cluster</div>
+        <div class="metric-value">{df['cluster'].nunique()}</div>
     </div>
     """, unsafe_allow_html=True)
 
-st.divider()
+st.markdown("---")
 
-# ======================
-# CHART 1: CONTENT TYPE
-# ======================
-st.subheader("Distribusi Jenis Konten")
+# ===============================
+# FILTER
+# ===============================
+st.subheader("🎯 Filter Data")
 
-type_counts = filtered_df["type"].value_counts()
+selected_type = st.selectbox(
+    "Pilih Tipe Konten",
+    options=df["type"].unique()
+)
+
+filtered_df = df[df["type"] == selected_type]
+
+# ===============================
+# VISUALISASI 1 — HISTOGRAM
+# ===============================
+st.subheader("📊 Distribusi Durasi Konten")
 
 fig1, ax1 = plt.subplots()
-type_counts.plot(kind="bar", ax=ax1)
-ax1.set_xlabel("Jenis Konten")
-ax1.set_ylabel("Jumlah")
+ax1.hist(filtered_df["duration_number"], bins=30)
+ax1.set_xlabel("Durasi")
+ax1.set_ylabel("Jumlah Konten")
 st.pyplot(fig1)
 
-# ======================
-# CHART 2: TOP GENRES
-# ======================
-st.subheader("Top 10 Genre Netflix")
+# ===============================
+# VISUALISASI 2 — BAR CHART
+# ===============================
+st.subheader("📦 Jumlah Konten per Tahun Rilis")
 
-genres = filtered_df["genres"].dropna().str.split(", ").explode()
-top_genres = genres.value_counts().head(10)
+year_count = filtered_df["release_year"].value_counts().sort_index()
 
 fig2, ax2 = plt.subplots()
-top_genres.plot(kind="bar", ax=ax2)
-ax2.set_xlabel("Genre")
-ax2.set_ylabel("Jumlah")
+ax2.bar(year_count.index, year_count.values)
+ax2.set_xlabel("Tahun Rilis")
+ax2.set_ylabel("Jumlah Konten")
 st.pyplot(fig2)
 
-# ======================
-# CHART 3: TREND PER YEAR
-# ======================
-st.subheader("Tren Penambahan Konten per Tahun")
-
-yearly = filtered_df["year_added"].value_counts().sort_index()
+# ===============================
+# VISUALISASI 3 — CLUSTERING
+# ===============================
+st.subheader("🧩 Segmentasi Konten Netflix (K-Means)")
 
 fig3, ax3 = plt.subplots()
-ax3.plot(yearly.index, yearly.values)
-ax3.set_xlabel("Tahun")
-ax3.set_ylabel("Jumlah Konten")
+scatter = ax3.scatter(
+    df["release_year"],
+    df["duration_number"],
+    c=df["cluster"],
+    alpha=0.6
+)
+ax3.set_xlabel("Tahun Rilis")
+ax3.set_ylabel("Durasi")
 st.pyplot(fig3)
+
+# ===============================
+# INTERPRETASI CLUSTER
+# ===============================
+st.markdown("""
+### 📌 Interpretasi Cluster
+- **Cluster 0**: Konten berdurasi pendek
+- **Cluster 1**: Konten berdurasi menengah
+- **Cluster 2**: Konten berdurasi panjang
+
+Segmentasi ini dapat membantu strategi rekomendasi dan pengelolaan konten Netflix.
+""")
+
+st.markdown("---")
+st.caption("UAS Big Data | Sistem Informasi | Universitas Sebelas April")
