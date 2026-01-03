@@ -9,16 +9,16 @@ st.set_page_config(
     page_title="Netflix Analytics Dashboard",
     layout="wide"
 )
-
 # ======================
-# NETFLIX STYLE
+# NETFLIX STYLE CSS
 # ======================
 st.markdown("""
 <style>
-body {
+.stApp {
     background-color: #141414;
     color: white;
 }
+
 h1, h2, h3 {
     color: #E50914;
 }
@@ -117,5 +117,6 @@ ax3.plot(yearly.index, yearly.values)
 ax3.set_xlabel("Tahun")
 ax3.set_ylabel("Jumlah Konten")
 st.pyplot(fig3)
+
 
 
