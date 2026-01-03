@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
 
 # ===============================
 # PAGE CONFIG
@@ -42,10 +44,6 @@ h1, h2, h3 {
     font-weight: bold;
     color: #FFFFFF;
 }
-
-.sidebar .sidebar-content {
-    background-color: #111111;
-}
 </style>
 """, unsafe_allow_html=True)
 
@@ -60,11 +58,22 @@ def load_data():
 df = load_data()
 
 # ===============================
-# DATA CLEANING RINGAN (AMAN)
+# DATA CLEANING
 # ===============================
 df["duration"] = df["duration"].astype(str)
 df["duration_number"] = df["duration"].str.extract(r"(\d+)").astype(float)
 df = df.dropna(subset=["duration_number", "release_year", "type"])
+
+# ===============================
+# K-MEANS CLUSTERING (REAL-TIME)
+# ===============================
+features = df[["release_year", "duration_number"]]
+
+scaler = StandardScaler()
+scaled_features = scaler.fit_transform(features)
+
+kmeans = KMeans(n_clusters=3, random_state=42)
+df["cluster"] = kmeans.fit_predict(scaled_features)
 
 # ===============================
 # HEADER
@@ -108,8 +117,6 @@ st.markdown("---")
 # ===============================
 # FILTER
 # ===============================
-st.subheader("🎯 Filter Data")
-
 selected_type = st.selectbox(
     "Pilih Tipe Konten",
     options=df["type"].unique()
@@ -118,7 +125,7 @@ selected_type = st.selectbox(
 filtered_df = df[df["type"] == selected_type]
 
 # ===============================
-# VISUALISASI 1 — HISTOGRAM
+# VISUALISASI — HISTOGRAM
 # ===============================
 st.subheader("📊 Distribusi Durasi Konten")
 
@@ -129,7 +136,7 @@ ax1.set_ylabel("Jumlah Konten")
 st.pyplot(fig1)
 
 # ===============================
-# VISUALISASI 2 — BAR CHART
+# VISUALISASI — BAR CHART
 # ===============================
 st.subheader("📦 Jumlah Konten per Tahun Rilis")
 
@@ -142,12 +149,12 @@ ax2.set_ylabel("Jumlah Konten")
 st.pyplot(fig2)
 
 # ===============================
-# VISUALISASI 3 — CLUSTERING
+# VISUALISASI — CLUSTERING
 # ===============================
 st.subheader("🧩 Segmentasi Konten Netflix (K-Means)")
 
 fig3, ax3 = plt.subplots()
-scatter = ax3.scatter(
+ax3.scatter(
     df["release_year"],
     df["duration_number"],
     c=df["cluster"],
@@ -158,7 +165,7 @@ ax3.set_ylabel("Durasi")
 st.pyplot(fig3)
 
 # ===============================
-# INTERPRETASI CLUSTER
+# INTERPRETASI
 # ===============================
 st.markdown("""
 ### 📌 Interpretasi Cluster
@@ -166,8 +173,7 @@ st.markdown("""
 - **Cluster 1**: Konten berdurasi menengah
 - **Cluster 2**: Konten berdurasi panjang
 
-Segmentasi ini dapat membantu strategi rekomendasi dan pengelolaan konten Netflix.
+Segmentasi ini membantu memahami karakteristik konten Netflix dan mendukung strategi rekomendasi.
 """)
 
-st.markdown("---")
 st.caption("UAS Big Data | Sistem Informasi | Universitas Sebelas April")
