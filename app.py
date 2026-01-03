@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
 
 # ======================
 # PAGE CONFIG
@@ -11,7 +13,7 @@ st.set_page_config(
 )
 
 # ======================
-# MODERN NETFLIX CSS
+# NETFLIX MODERN CSS
 # ======================
 st.markdown("""
 <style>
@@ -57,7 +59,7 @@ df["duration"] = df["duration"].astype(str)
 df["duration_number"] = df["duration"].str.extract("(\d+)")[0].astype(float)
 
 # ======================
-# SIDEBAR
+# SIDEBAR FILTER
 # ======================
 st.sidebar.title("🎬 Netflix Filter")
 
@@ -84,10 +86,19 @@ filtered_df = filtered_df[
 ]
 
 # ======================
-# TITLE
+# HEADER WITH LOGO
 # ======================
-st.title("📊 Netflix Content Analytics")
-st.caption("Dashboard analitik interaktif untuk eksplorasi konten Netflix")
+col_logo, col_title = st.columns([1, 6])
+
+with col_logo:
+    st.image(
+        "https://upload.wikimedia.org/wikipedia/commons/0/08/Netflix_2015_logo.svg",
+        width=90
+    )
+
+with col_title:
+    st.title("Netflix Content Analytics")
+    st.caption("Dashboard analitik interaktif untuk eksplorasi konten Netflix")
 
 st.divider()
 
@@ -123,11 +134,11 @@ with c3:
 st.divider()
 
 # ======================
-# CHARTS (PLOTLY)
+# CHARTS SECTION
 # ======================
 col_left, col_right = st.columns(2)
 
-# Content Type Chart
+# Distribusi Jenis Konten
 with col_left:
     st.subheader("Distribusi Jenis Konten")
     type_counts = filtered_df["type"].value_counts().reset_index()
@@ -142,9 +153,9 @@ with col_left:
     )
     st.plotly_chart(fig_type, use_container_width=True)
 
-# Top Genres
+# Top Genre
 with col_right:
-    st.subheader("Top 10 Genre")
+    st.subheader("Top 10 Genre Netflix")
     genres = filtered_df["genres"].dropna().str.split(", ").explode()
     top_genres = genres.value_counts().head(10).reset_index()
     top_genres.columns = ["Genre", "Count"]
@@ -174,3 +185,38 @@ fig_trend = px.line(
 )
 
 st.plotly_chart(fig_trend, use_container_width=True)
+
+# ======================
+# CLUSTERING SECTION
+# ======================
+st.divider()
+st.subheader("🔍 Segmentasi Konten Netflix (Clustering)")
+st.write(
+    "Konten dikelompokkan menggunakan metode K-Means "
+    "berdasarkan tahun rilis dan durasi."
+)
+
+cluster_df = filtered_df[
+    ["release_year", "duration_number"]
+].dropna()
+
+scaler = StandardScaler()
+scaled_features = scaler.fit_transform(cluster_df)
+
+kmeans = KMeans(n_clusters=3, random_state=42)
+cluster_df["cluster"] = kmeans.fit_predict(scaled_features)
+
+fig_cluster = px.scatter(
+    cluster_df,
+    x="release_year",
+    y="duration_number",
+    color="cluster",
+    labels={
+        "release_year": "Tahun Rilis",
+        "duration_number": "Durasi",
+        "cluster": "Cluster"
+    },
+    title="Clustering Konten Netflix"
+)
+
+st.plotly_chart(fig_cluster, use_container_width=True)
