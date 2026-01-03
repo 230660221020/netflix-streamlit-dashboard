@@ -33,7 +33,8 @@ df = pd.read_csv("NetFlix.csv")
 # Cleaning ringan (supaya aman di dashboard)
 df["date_added"] = pd.to_datetime(df["date_added"], errors="coerce")
 df["year_added"] = df["date_added"].dt.year
-df["duration_number"] = df["duration"].str.extract("(\d+)").astype(float)
+df["duration"] = df["duration"].astype(str)
+df["duration_number"] = df["duration"].str.extract("(\d+)")[0].astype(float)
 
 # ======================
 # TITLE
@@ -90,3 +91,4 @@ ax3.plot(yearly.index, yearly.values)
 ax3.set_xlabel("Tahun")
 ax3.set_ylabel("Jumlah Konten")
 st.pyplot(fig3)
+
