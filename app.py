@@ -1,179 +1,176 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
-from sklearn.cluster import KMeans
-from sklearn.preprocessing import StandardScaler
+import plotly.express as px
 
-# ===============================
+# ======================
 # PAGE CONFIG
-# ===============================
+# ======================
 st.set_page_config(
     page_title="Netflix Analytics Dashboard",
     layout="wide"
 )
 
-# ===============================
-# CUSTOM CSS (NETFLIX STYLE)
-# ===============================
+# ======================
+# MODERN NETFLIX CSS
+# ======================
 st.markdown("""
 <style>
 .stApp {
-    background-color: #0E1117;
+    background-color: #0f0f0f;
     color: white;
 }
 
 h1, h2, h3 {
     color: #E50914;
+    font-weight: 700;
 }
 
-.metric-card {
-    background-color: #1F2933;
-    padding: 20px;
-    border-radius: 15px;
+.card {
+    background: linear-gradient(135deg, #1f1f1f, #141414);
+    padding: 24px;
+    border-radius: 16px;
     text-align: center;
-    box-shadow: 0px 4px 12px rgba(0,0,0,0.5);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
 }
 
-.metric-title {
+.card-title {
     font-size: 16px;
-    color: #AAAAAA;
+    color: #b3b3b3;
 }
 
-.metric-value {
-    font-size: 32px;
+.card-value {
+    font-size: 40px;
     font-weight: bold;
-    color: #FFFFFF;
+    color: #ffffff;
 }
 </style>
 """, unsafe_allow_html=True)
 
-# ===============================
-# LOAD DATA
-# ===============================
-@st.cache_data
-def load_data():
-    df = pd.read_csv("NetFlix.csv")
-    return df
+# ======================
+# LOAD & PREPROCESS DATA
+# ======================
+df = pd.read_csv("NetFlix.csv")
 
-df = load_data()
-
-# ===============================
-# DATA CLEANING
-# ===============================
+df["date_added"] = pd.to_datetime(df["date_added"], errors="coerce")
+df["year_added"] = df["date_added"].dt.year
 df["duration"] = df["duration"].astype(str)
-df["duration_number"] = df["duration"].str.extract(r"(\d+)").astype(float)
-df = df.dropna(subset=["duration_number", "release_year", "type"])
+df["duration_number"] = df["duration"].str.extract("(\d+)")[0].astype(float)
 
-# ===============================
-# K-MEANS CLUSTERING (REAL-TIME)
-# ===============================
-features = df[["release_year", "duration_number"]]
+# ======================
+# SIDEBAR
+# ======================
+st.sidebar.title("🎬 Netflix Filter")
 
-scaler = StandardScaler()
-scaled_features = scaler.fit_transform(features)
-
-kmeans = KMeans(n_clusters=3, random_state=42)
-df["cluster"] = kmeans.fit_predict(scaled_features)
-
-# ===============================
-# HEADER
-# ===============================
-st.title("🎬 Netflix Analytics Dashboard")
-st.markdown(
-    "Dashboard interaktif untuk analisis dan segmentasi konten Netflix menggunakan pendekatan Big Data."
+content_type = st.sidebar.radio(
+    "Jenis Konten",
+    ["All", "Movie", "TV Show"]
 )
 
-# ===============================
+year_range = st.sidebar.slider(
+    "Tahun Rilis",
+    int(df["release_year"].min()),
+    int(df["release_year"].max()),
+    (2015, 2020)
+)
+
+filtered_df = df.copy()
+
+if content_type != "All":
+    filtered_df = filtered_df[filtered_df["type"] == content_type]
+
+filtered_df = filtered_df[
+    (filtered_df["release_year"] >= year_range[0]) &
+    (filtered_df["release_year"] <= year_range[1])
+]
+
+# ======================
+# TITLE
+# ======================
+st.title("📊 Netflix Content Analytics")
+st.caption("Dashboard analitik interaktif untuk eksplorasi konten Netflix")
+
+st.divider()
+
+# ======================
 # METRIC CARDS
-# ===============================
-col1, col2, col3 = st.columns(3)
+# ======================
+c1, c2, c3 = st.columns(3)
 
-with col1:
+with c1:
     st.markdown(f"""
-    <div class="metric-card">
-        <div class="metric-title">Total Konten</div>
-        <div class="metric-value">{df.shape[0]}</div>
+    <div class="card">
+        <div class="card-title">Total Konten</div>
+        <div class="card-value">{len(filtered_df)}</div>
     </div>
     """, unsafe_allow_html=True)
 
-with col2:
+with c2:
     st.markdown(f"""
-    <div class="metric-card">
-        <div class="metric-title">Rata-rata Durasi</div>
-        <div class="metric-value">{df['duration_number'].mean():.1f}</div>
+    <div class="card">
+        <div class="card-title">Movie</div>
+        <div class="card-value">{(filtered_df["type"] == "Movie").sum()}</div>
     </div>
     """, unsafe_allow_html=True)
 
-with col3:
+with c3:
     st.markdown(f"""
-    <div class="metric-card">
-        <div class="metric-title">Jumlah Cluster</div>
-        <div class="metric-value">{df['cluster'].nunique()}</div>
+    <div class="card">
+        <div class="card-title">TV Show</div>
+        <div class="card-value">{(filtered_df["type"] == "TV Show").sum()}</div>
     </div>
     """, unsafe_allow_html=True)
 
-st.markdown("---")
+st.divider()
 
-# ===============================
-# FILTER
-# ===============================
-selected_type = st.selectbox(
-    "Pilih Tipe Konten",
-    options=df["type"].unique()
+# ======================
+# CHARTS (PLOTLY)
+# ======================
+col_left, col_right = st.columns(2)
+
+# Content Type Chart
+with col_left:
+    st.subheader("Distribusi Jenis Konten")
+    type_counts = filtered_df["type"].value_counts().reset_index()
+    type_counts.columns = ["Type", "Count"]
+
+    fig_type = px.bar(
+        type_counts,
+        x="Type",
+        y="Count",
+        color="Type",
+        color_discrete_sequence=["#E50914", "#b3b3b3"]
+    )
+    st.plotly_chart(fig_type, use_container_width=True)
+
+# Top Genres
+with col_right:
+    st.subheader("Top 10 Genre")
+    genres = filtered_df["genres"].dropna().str.split(", ").explode()
+    top_genres = genres.value_counts().head(10).reset_index()
+    top_genres.columns = ["Genre", "Count"]
+
+    fig_genre = px.bar(
+        top_genres,
+        x="Genre",
+        y="Count",
+        color="Count",
+        color_continuous_scale="reds"
+    )
+    st.plotly_chart(fig_genre, use_container_width=True)
+
+# ======================
+# TREND LINE
+# ======================
+st.subheader("Tren Penambahan Konten per Tahun")
+
+yearly = filtered_df["year_added"].value_counts().sort_index().reset_index()
+yearly.columns = ["Year", "Total"]
+
+fig_trend = px.line(
+    yearly,
+    x="Year",
+    y="Total",
+    markers=True
 )
 
-filtered_df = df[df["type"] == selected_type]
-
-# ===============================
-# VISUALISASI — HISTOGRAM
-# ===============================
-st.subheader("📊 Distribusi Durasi Konten")
-
-fig1, ax1 = plt.subplots()
-ax1.hist(filtered_df["duration_number"], bins=30)
-ax1.set_xlabel("Durasi")
-ax1.set_ylabel("Jumlah Konten")
-st.pyplot(fig1)
-
-# ===============================
-# VISUALISASI — BAR CHART
-# ===============================
-st.subheader("📦 Jumlah Konten per Tahun Rilis")
-
-year_count = filtered_df["release_year"].value_counts().sort_index()
-
-fig2, ax2 = plt.subplots()
-ax2.bar(year_count.index, year_count.values)
-ax2.set_xlabel("Tahun Rilis")
-ax2.set_ylabel("Jumlah Konten")
-st.pyplot(fig2)
-
-# ===============================
-# VISUALISASI — CLUSTERING
-# ===============================
-st.subheader("🧩 Segmentasi Konten Netflix (K-Means)")
-
-fig3, ax3 = plt.subplots()
-ax3.scatter(
-    df["release_year"],
-    df["duration_number"],
-    c=df["cluster"],
-    alpha=0.6
-)
-ax3.set_xlabel("Tahun Rilis")
-ax3.set_ylabel("Durasi")
-st.pyplot(fig3)
-
-# ===============================
-# INTERPRETASI
-# ===============================
-st.markdown("""
-### 📌 Interpretasi Cluster
-- **Cluster 0**: Konten berdurasi pendek
-- **Cluster 1**: Konten berdurasi menengah
-- **Cluster 2**: Konten berdurasi panjang
-
-Segmentasi ini membantu memahami karakteristik konten Netflix dan mendukung strategi rekomendasi.
-""")
-
-st.caption("UAS Big Data | Sistem Informasi | Universitas Sebelas April")
+st.plotly_chart(fig_trend, use_container_width=True)
